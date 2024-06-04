@@ -156,7 +156,7 @@ def calc_anomeric_penalty(mol, substituents, coords):
             k1 = -0.5
             k2 = 2.0
             k3 = 1.5
-            penalty += k1 * (1.0 + math.cos(1 * angle))
+            penalty += k1 * (1.0 + math.cos(1 * angle)) + 1  # guarantee penalty is non-negative
             penalty += k2 * (1.0 + math.cos(2 * angle))
             penalty += k3 * (1.0 + math.cos(3 * angle))
     return penalty
@@ -307,7 +307,7 @@ def expand_reasonable_chairs(coords, idxs, ringinfo, substituents, mol, axial_li
                 return [coords]
 
     starting_axial_likeliness = calc_axial_likeliness(substituents, coords)
-    starting_axial_likeliness = calc_anomeric_penalty(mol, substituents, coords)
+    starting_axial_likeliness += calc_anomeric_penalty(mol, substituents, coords)
 
     # find best corner to flip based on alignment of rod-hinge vectors
     # as well as the number of substituents on both corners
@@ -339,14 +339,15 @@ def expand_reasonable_chairs(coords, idxs, ringinfo, substituents, mol, axial_li
     newpos = rotate_corner(idxs[(best_index + 3) % 6], ringinfo, substituents, newpos, rotangle2)
     new_axial_likeliness = calc_axial_likeliness(substituents, newpos)
     new_axial_likeliness += calc_anomeric_penalty(mol, substituents, newpos)
-    if starting_axial_likeliness < 0.05 and new_axial_likeliness < 0.05: # no subs?
+    delta_axial_likeliness = new_axial_likeliness - starting_axial_likeliness
+    if starting_axial_likeliness < 0.001 and new_axial_likeliness < 0.001: # no subs?
+        return [coords] # avoids expanding nr confs when unnecessary
+    elif delta_axial_likeliness > axial_likeliness_range:
         return [coords]
-    elif (not new_axial_likeliness == 0 and not starting_axial_likeliness==0) and ( new_axial_likeliness / starting_axial_likeliness > 1.0 + axial_likeliness_range ):
-        return [coords]
-    elif (not starting_axial_likeliness == 0 and not new_axial_likeliness == 0) and (starting_axial_likeliness / new_axial_likeliness > 1.0 + axial_likeliness_range):
+    elif delta_axial_likeliness < axial_likeliness_range:
         return [newpos]
     else:
-        return [coords, newpos]
+        return [coords, newpos] # new and starting similar, return both
 
 
 def convert_boat_to_chair(mol, coords, idxs, debug):
