@@ -344,7 +344,7 @@ def expand_reasonable_chairs(coords, idxs, ringinfo, substituents, mol, axial_li
         return [coords] # avoids expanding nr confs when unnecessary
     elif delta_axial_likeliness > axial_likeliness_range:
         return [coords]
-    elif delta_axial_likeliness < axial_likeliness_range:
+    elif delta_axial_likeliness < -axial_likeliness_range:
         return [newpos]
     else:
         return [coords, newpos] # new and starting similar, return both
