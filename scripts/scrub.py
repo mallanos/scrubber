@@ -417,31 +417,31 @@ else:
     scrub_fn = scrub_and_catch_errors
     sdwriter_failures = None
 
-
-with Writer(args.out_fname) as w:
-    if args.cpu == 1:
-        for input_mol in supplier:
-            isomer_list, log = scrub_fn(input_mol, sdwriter_failures)
-            write_and_log(isomer_list, log, counter)
-    else:
-        if args.cpu < 1:
-            nr_proc = multiprocessing.cpu_count()
+if __name__ == '__main__':
+    with Writer(args.out_fname) as w:
+        if args.cpu == 1:
+            for input_mol in supplier:
+                isomer_list, log = scrub_fn(input_mol, sdwriter_failures)
+                write_and_log(isomer_list, log, counter)
         else:
-            nr_proc = args.cpu
-        p = multiprocessing.Pool(nr_proc - 1) # leave 1 for main process
-        for (isomer_list, log) in p.imap_unordered(scrub_fn, supplier):
-            write_and_log(isomer_list, log, counter)
+            if args.cpu < 1:
+                nr_proc = multiprocessing.cpu_count()
+            else:
+                nr_proc = args.cpu
+            p = multiprocessing.Pool(nr_proc - 1) # leave 1 for main process
+            for (isomer_list, log) in p.imap_unordered(scrub_fn, supplier):
+                write_and_log(isomer_list, log, counter)
 
 
-if sdwriter_failures is not None:
-    sdwriter_failures.close()
+    if sdwriter_failures is not None:
+        sdwriter_failures.close()
 
-print("Scrub completed.\nSummary of what happened:")
-print(get_info_str(counter), end="")
+    print("Scrub completed.\nSummary of what happened:")
+    print(get_info_str(counter), end="")
 
-if args.wcg:
-    fname = pathlib.Path(args.out_fname).with_suffix(".renaming.json")
-    print("Writing %s" % (fname))
-    with open(fname, "w") as f:
-        json.dump(supplier.names, f)
-    print("Done.")
+    if args.wcg:
+        fname = pathlib.Path(args.out_fname).with_suffix(".renaming.json")
+        print("Writing %s" % (fname))
+        with open(fname, "w") as f:
+            json.dump(supplier.names, f)
+        print("Done.")
