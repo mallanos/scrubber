@@ -496,7 +496,7 @@ class Scrub:
         max_ff_iter=200,
         numconfs=1,
         etkdg_rng_seed=None,
-        ff="uff",
+        ff="mmff94s",
     ):
         self.acid_base_conjugator = AcidBaseConjugator.from_default_data_files()
         self.tautomerizer = Tautomerizer.from_default_data_files()
@@ -570,7 +570,7 @@ def constrained_embeding(
     core_mol,
     template_smarts: str = None,
     numconfs: int = 1,
-    ff: str = "uff",
+    ff: str = "mmff94s",
     ps=None,
 ):
     """Generate an embedding of a query molecule where part of the molecule
@@ -693,7 +693,7 @@ def gen3d(
     max_ff_iter: int = 200,
     etkdg_rng_seed=None,
     numconfs: int = 1,
-    ff: str = "uff",
+    ff: str = "mmff94s",
     espaloma=None,
     template=None,
     template_smarts=None,
@@ -716,7 +716,7 @@ def gen3d(
             core_mol=template,
             template_smarts=template_smarts,
             numconfs=numconfs,
-            ff="uff",
+            ff=ff,
             ps=ps,
         )
 
@@ -742,30 +742,30 @@ def gen3d(
             c.SetAtomPosition(i, Point3D(x, y, z))
         mol.AddConformer(c, assignId=True)
 
-    if ff == "uff":
-        _energies = rdForceFieldHelpers.UFFOptimizeMoleculeConfs(mol, maxIters=max_ff_iter)
-        energies = [e[1] for e in _energies]
-    elif ff == "mmff94":
-        _energies = rdForceFieldHelpers.MMFFOptimizeMoleculeConfs(mol, maxIters=max_ff_iter)
-        energies = [e[1] for e in _energies]
-    elif ff == "mmff94s":
-        _energies = rdForceFieldHelpers.MMFFOptimizeMoleculeConfs(mol, maxIters=max_ff_iter, mmffVariant="mmff94s")
-        energies = [e[1] for e in _energies]
-    elif ff == 'espaloma':
+    if ff not in ["uff", "mmff94", "mmff94s", "espaloma"]:
+        raise RuntimeError(
+            f"ff is {ff} but must be 'uff', 'mmff94', 'mmff94s', or 'espaloma'"
+        )
+
+    if ff == "espaloma":
         if espaloma is None:
-            raise ValueError("minim_espaloma needs to be passed")
+            raise ValueError("espaloma minimizer needs to be passed")
         mol, energies = espaloma.minim_espaloma(mol)
     else:
-        raise RuntimeError("ff is %s but must be 'uff', 'mmff94', 'mmff94s', or 'espaloma'" % ff)
+        optimize_func = {
+            "uff": rdForceFieldHelpers.UFFOptimizeMoleculeConfs,
+            "mmff94": rdForceFieldHelpers.MMFFOptimizeMoleculeConfs,
+            "mmff94s": lambda mol, maxIters: rdForceFieldHelpers.MMFFOptimizeMoleculeConfs(
+                mol, maxIters=maxIters, mmffVariant="mmff94s"
+            ),
+        }[ff]
+        _energies = optimize_func(mol, maxIters=max_ff_iter)
+        energies = [e[1] for e in _energies]
+
+    best_energy_index = min(zip(cids, energies), key=lambda x: x[1])[0]
+    final_mol = _ConfToMol(mol, best_energy_index)
     
-    lista = [list(a) for a in zip(cids, energies)]
-    sorted_list = sorted(lista, key=lambda x: x[1])
-    best_energy_index = sorted_list[0][0]
-    final_mol = _ConfToMol(mol,best_energy_index)
-   
     return final_mol
 
 if __name__ == "__main__":
-    import json
     config = ScrubberCore.get_defaults()
-    print("CONFIG!")
